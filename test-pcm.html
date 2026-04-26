@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test PCM — Process Communication Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Manrope:wght@300..700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #F1EBE0;
+    --bg-deep: #E8E1D2;
+    --paper: #FBF7EF;
+    --ink: #1C1A17;
+    --ink-soft: #3A352E;
+    --muted: #7A7065;
+    --hair: #D9D2C5;
+    --hair-strong: #BFB6A6;
+
+    --c-penseur:     #2D5C53;
+    --c-perseverant: #6B3F5E;
+    --c-empathique:  #C25A3F;
+    --c-reveur:      #8B7E6E;
+    --c-rebelle:     #B5343A;
+    --c-promoteur:   #C89544;
+
+    --serif: 'Fraunces', 'Cormorant Garamond', Georgia, serif;
+    --sans: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-weight: 400;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100%;
+  }
+
+  /* Subtle paper grain */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.35;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='4'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  .app {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 36px 28px 80px;
+    min-height: 100vh;
+    position: relative;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--hair);
+    margin-bottom: 56px;
+  }
+
+  .brand {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .brand-mark {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 22px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .brand-sub {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+
+  .header-meta {
+    text-align: right;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+
+  /* Screens */
+  .screen {
+    display: none;
+    animation: fade-in 0.5s ease both;
+  }
+  .screen.active { display: block; }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Welcome */
+  .welcome-eyebrow {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
+  .welcome-eyebrow::before {
+    content: '— ';
+    color: var(--ink-soft);
+  }
+
+  h1.title {
+    font-family: var(--serif);
+    font-weight: 350;
+    font-size: clamp(48px, 8vw, 92px);
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+    margin-bottom: 24px;
+    font-variation-settings: 'opsz' 144, 'SOFT' 50;
+  }
+
+  h1.title em {
+    font-style: italic;
+    font-weight: 300;
+    color: var(--c-penseur);
+  }
+
+  .lede {
+    font-family: var(--serif);
+    font-size: clamp(18px, 2.4vw, 22px);
+    font-weight: 350;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 620px;
+    margin: 32px 0 48px;
+  }
+
+  .types-row {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin: 48px 0;
+    padding: 24px 0;
+    border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+  }
+
+  .types-row .type-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .type-chip .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .type-chip .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+
+  .meta-list {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .meta-list span strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 28px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    transition: all 0.25s ease;
+    border-radius: 0;
+  }
+  .btn:hover { background: var(--c-penseur); transform: translateY(-1px); }
+  .btn .arrow {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-style: italic;
+    line-height: 1;
+    transition: transform 0.25s;
+  }
+  .btn:hover .arrow { transform: translateX(4px); }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--ink);
+  }
+  .btn-secondary:hover { background: var(--ink); color: var(--paper); }
+
+  /* Quiz */
+  .quiz-progress {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 56px;
+  }
+  .progress-count {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+  }
+  .progress-count .current {
+    font-size: 36px;
+    font-style: normal;
+    font-weight: 350;
+    color: var(--ink);
+    margin-right: 6px;
+    letter-spacing: -0.02em;
+  }
+  .progress-bar {
+    flex: 1;
+    height: 1px;
+    background: var(--hair);
+    margin: 0 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    transform-origin: left;
+    transition: transform 0.5s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  .progress-pct {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  .question-block {
+    margin-bottom: 56px;
+    min-height: 280px;
+  }
+
+  .question-num {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+
+  .question-text {
+    font-family: var(--serif);
+    font-weight: 350;
+    font-size: clamp(28px, 4vw, 42px);
+    line-height: 1.18;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+    max-width: 760px;
+  }
+
+  .likert {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .likert-option {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 22px;
+    background: var(--paper);
+    border: 1px solid var(--hair);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 15px;
+    color: var(--ink-soft);
+    font-weight: 400;
+    text-align: left;
+    width: 100%;
+    font-family: inherit;
+  }
+
+  .likert-option:hover {
+    border-color: var(--ink);
+    transform: translateX(4px);
+  }
+
+  .likert-option.selected {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+  .likert-option.selected .likert-pip { background: var(--paper); }
+
+  .likert-pip {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--hair-strong);
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .likert-option:hover .likert-pip { background: var(--ink); }
+
+  .likert-num {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .likert-option.selected .likert-num { color: rgba(251,247,239,0.6); }
+
+  .quiz-nav {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--hair);
+  }
+
+  .nav-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--sans);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink);
+    padding: 8px 0;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .nav-btn:hover:not(:disabled) { color: var(--c-penseur); }
+  .nav-btn:disabled { color: var(--hair-strong); cursor: not-allowed; }
+
+  /* Results */
+  .results-eyebrow {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+  .results-eyebrow::before {
+    content: '— ';
+    color: var(--ink-soft);
+  }
+
+  .result-headline {
+    font-family: var(--serif);
+    font-weight: 350;
+    font-size: clamp(48px, 7vw, 84px);
+    line-height: 0.98;
+    letter-spacing: -0.025em;
+    margin-bottom: 12px;
+  }
+  .result-headline .type-name {
+    font-style: italic;
+    font-weight: 300;
+  }
+
+  .result-subtitle {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 20px;
+    color: var(--muted);
+    margin-bottom: 48px;
+  }
+
+  .result-section {
+    margin-top: 48px;
+    padding-top: 32px;
+    border-top: 1px solid var(--hair);
+  }
+
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  /* Bar chart */
+  .chart {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .chart-row {
+    display: grid;
+    grid-template-columns: 130px 1fr 60px;
+    align-items: center;
+    gap: 20px;
+  }
+  .chart-label {
+    font-family: var(--serif);
+    font-size: 17px;
+    color: var(--ink);
+  }
+  .chart-bar-track {
+    height: 28px;
+    background: var(--bg-deep);
+    position: relative;
+    overflow: hidden;
+  }
+  .chart-bar-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    transition: width 1.4s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  .chart-value {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 16px;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+
+  /* Type description card */
+  .type-card {
+    background: var(--paper);
+    padding: 36px;
+    border: 1px solid var(--hair);
+    margin-top: 24px;
+  }
+  .type-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .type-card-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+  }
+  .type-card-name {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 400;
+  }
+  .type-card-desc {
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin-bottom: 24px;
+  }
+  .type-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px 36px;
+    padding-top: 24px;
+    border-top: 1px solid var(--hair);
+  }
+  .tcg-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .tcg-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+  .tcg-value {
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+
+  .actions {
+    display: flex;
+    gap: 16px;
+    margin-top: 48px;
+    flex-wrap: wrap;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--hair);
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+
+  /* Mobile */
+  @media (max-width: 640px) {
+    .app { padding: 24px 20px 60px; }
+    .header { margin-bottom: 40px; }
+    .types-row { grid-template-columns: repeat(3, 1fr); gap: 16px 10px; }
+    .progress-bar { margin: 0 16px; }
+    .progress-count .current { font-size: 28px; }
+    .question-block { margin-bottom: 40px; min-height: 0; }
+    .chart-row { grid-template-columns: 100px 1fr 50px; gap: 12px; }
+    .chart-label { font-size: 14px; }
+    .type-card { padding: 24px; }
+    .type-card-grid { grid-template-columns: 1fr; gap: 18px; }
+    .header-meta { font-size: 9px; }
+    .actions { flex-direction: column; }
+    .actions .btn { justify-content: center; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">P<span style="font-style:normal">·</span>C<span style="font-style:normal">·</span>M</div>
+      <div class="brand-sub">Process Communication Model</div>
+    </div>
+    <div class="header-meta">
+      <div id="header-date"></div>
+      <div style="margin-top:4px">Test de personnalité · 36 questions</div>
+    </div>
+  </header>
+
+  <!-- WELCOME -->
+  <section id="screen-welcome" class="screen active">
+    <div class="welcome-eyebrow">Édition personnelle</div>
+    <h1 class="title">Découvre ton<br>profil <em>de personnalité.</em></h1>
+    <p class="lede">
+      Inspiré du modèle Process Communication développé par Taibi Kahler, ce test identifie ta dominante
+      parmi six manières fondamentales de percevoir le monde et de communiquer avec les autres.
+    </p>
+
+    <div class="types-row">
+      <div class="type-chip"><span class="dot" style="background:var(--c-penseur)"></span><span class="label">Penseur</span></div>
+      <div class="type-chip"><span class="dot" style="background:var(--c-perseverant)"></span><span class="label">Persévérant</span></div>
+      <div class="type-chip"><span class="dot" style="background:var(--c-empathique)"></span><span class="label">Empathique</span></div>
+      <div class="type-chip"><span class="dot" style="background:var(--c-reveur)"></span><span class="label">Rêveur</span></div>
+      <div class="type-chip"><span class="dot" style="background:var(--c-rebelle)"></span><span class="label">Rebelle</span></div>
+      <div class="type-chip"><span class="dot" style="background:var(--c-promoteur)"></span><span class="label">Promoteur</span></div>
+    </div>
+
+    <div class="meta-list">
+      <span><strong>36</strong> énoncés</span>
+      <span><strong>5 min</strong> environ</span>
+      <span><strong>Aucune</strong> bonne réponse</span>
+      <span>Réponds spontanément</span>
+    </div>
+
+    <button class="btn" onclick="startQuiz()">Commencer le test <span class="arrow">→</span></button>
+  </section>
+
+  <!-- QUIZ -->
+  <section id="screen-quiz" class="screen">
+    <div class="quiz-progress">
+      <div class="progress-count"><span class="current" id="q-current">01</span><span>/ 36</span></div>
+      <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill" style="transform:scaleX(0)"></div></div>
+      <div class="progress-pct" id="progress-pct">0%</div>
+    </div>
+
+    <div class="question-block">
+      <div class="question-num" id="q-num">Question 01</div>
+      <div class="question-text" id="q-text">—</div>
+    </div>
+
+    <div class="likert" id="likert">
+      <button class="likert-option" data-val="1"><span class="likert-pip"></span>Pas du tout d'accord<span class="likert-num">01</span></button>
+      <button class="likert-option" data-val="2"><span class="likert-pip"></span>Plutôt en désaccord<span class="likert-num">02</span></button>
+      <button class="likert-option" data-val="3"><span class="likert-pip"></span>Neutre<span class="likert-num">03</span></button>
+      <button class="likert-option" data-val="4"><span class="likert-pip"></span>Plutôt d'accord<span class="likert-num">04</span></button>
+      <button class="likert-option" data-val="5"><span class="likert-pip"></span>Tout à fait d'accord<span class="likert-num">05</span></button>
+    </div>
+
+    <div class="quiz-nav">
+      <button class="nav-btn" id="btn-prev" onclick="prevQuestion()" disabled>← Précédent</button>
+      <button class="nav-btn" id="btn-next" onclick="nextQuestion()" disabled>Suivant →</button>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="screen-results" class="screen">
+    <div class="results-eyebrow">Tes résultats</div>
+    <h1 class="result-headline">Ta dominante :<br><span class="type-name" id="dominant-name">—</span></h1>
+    <div class="result-subtitle" id="dominant-tagline">—</div>
+
+    <div class="result-section">
+      <div class="section-label">Répartition des six profils</div>
+      <div class="chart" id="chart"></div>
+    </div>
+
+    <div class="result-section">
+      <div class="section-label">Profil détaillé</div>
+      <div class="type-card" id="type-card"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" onclick="exportPDF()">Exporter en PDF <span class="arrow">↓</span></button>
+      <button class="btn btn-secondary" onclick="resetTest()">Recommencer <span class="arrow">↻</span></button>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div>© Test PCM</div>
+    <div id="footer-status">— Édition personnelle —</div>
+  </footer>
+</div>
+
+<script>
+// =================================================================
+// PCM Test - Data
+// =================================================================
+
+const TYPES = {
+  penseur: {
+    name: 'Penseur',
+    color: '#2D5C53',
+    tagline: 'Logique, organisé, responsable.',
+    description: "Tu perçois le monde à travers la pensée. Tu structures, tu analyses, tu planifies. Les faits, les données et la logique sont tes meilleurs alliés. Tu es reconnu pour ton sens des responsabilités et ta capacité à mener les choses à terme avec rigueur.",
+    forces: 'Logique, organisé, responsable, fiable',
+    perception: 'Les faits, les pensées',
+    besoins: 'Reconnaissance du travail accompli, structuration du temps',
+    communication: "Demande des informations claires, parle en termes de faits",
+    stress: 'Surcontrôle, perfectionnisme, devient pinailleur',
+    environnement: 'Bureau structuré, horaires définis, objectifs mesurables'
+  },
+  perseverant: {
+    name: 'Persévérant',
+    color: '#6B3F5E',
+    tagline: 'Engagé, dévoué, observateur.',
+    description: "Tu perçois le monde à travers tes opinions et tes valeurs. Tu t'engages avec conviction dans ce qui compte pour toi et tu défends ce que tu crois juste. Loyal et consciencieux, tu donnes le meilleur quand le projet a du sens à tes yeux.",
+    forces: 'Engagé, observateur, dévoué, consciencieux',
+    perception: 'Les opinions, les jugements de valeur',
+    besoins: 'Reconnaissance du travail et des convictions',
+    communication: 'Échange autour des valeurs et des opinions',
+    stress: 'Devient critique, part en croisade, rigide',
+    environnement: 'Mission qui a du sens, valeurs partagées'
+  },
+  empathique: {
+    name: 'Empathique',
+    color: '#C25A3F',
+    tagline: 'Compatissant, sensible, chaleureux.',
+    description: "Tu perçois le monde à travers les émotions. Les relations humaines sont au cœur de ton fonctionnement. Tu sens les autres avec finesse, tu crées des espaces chaleureux et tu fais souvent le ciment d'un groupe. Tu donnes énormément aux autres.",
+    forces: 'Compatissant, sensible, chaleureux, attentionné',
+    perception: 'Les émotions',
+    besoins: 'Reconnaissance de la personne, besoins sensoriels',
+    communication: 'Exprime et reçoit des sentiments',
+    stress: 'Trop conciliant, s\'oublie, fait des erreurs d\'inattention',
+    environnement: 'Ambiance chaleureuse, contact humain, esthétique soignée'
+  },
+  reveur: {
+    name: 'Rêveur',
+    color: '#8B7E6E',
+    tagline: 'Calme, imaginatif, réfléchi.',
+    description: "Tu perçois le monde à travers tes réflexions intérieures. Tu as une vie intérieure riche et tu apprécies le calme. Imaginatif et observateur, tu vois ce que les autres ne voient pas. Tu rends de précieux services quand on te laisse l'espace pour penser.",
+    forces: 'Calme, imaginatif, introspectif, réfléchi',
+    perception: 'Les réflexions, l\'imagination',
+    besoins: 'Solitude, espace de recul, temps pour soi',
+    communication: 'Apprécie les directives bienveillantes et claires',
+    stress: 'Se retire, devient passif, se fait oublier',
+    environnement: 'Espace tranquille, peu d\'interruptions'
+  },
+  rebelle: {
+    name: 'Rebelle',
+    color: '#B5343A',
+    tagline: 'Spontané, créatif, ludique.',
+    description: "Tu perçois le monde à travers tes réactions instinctives — j'aime, j'aime pas. Vif, créatif, plein d'humour, tu détestes l'ennui et tu sais injecter du fun partout où tu passes. Tu réagis au moment présent avec une énergie qui contamine ton entourage.",
+    forces: 'Spontané, créatif, ludique, énergique',
+    perception: 'Les réactions (j\'aime / j\'aime pas)',
+    besoins: 'Contacts ludiques, stimulation, plaisir',
+    communication: 'Humour, jeu, vocabulaire imagé',
+    stress: 'Critique, se braque, fait porter le chapeau aux autres',
+    environnement: 'Espace stimulant, varié, avec de l\'humour'
+  },
+  promoteur: {
+    name: 'Promoteur',
+    color: '#C89544',
+    tagline: 'Adaptable, charmeur, plein de ressources.',
+    description: "Tu perçois le monde à travers l'action. Tu fonces, tu t'adaptes, tu sais te débrouiller dans à peu près n'importe quelle situation. Charmeur et persuasif, tu aimes les défis, l'adrénaline et la victoire. L'action vaut mille mots, à tes yeux.",
+    forces: 'Adaptable, charmeur, plein de ressources, fonceur',
+    perception: 'Les actions',
+    besoins: 'Excitation, défis, stimulation forte',
+    communication: 'Action directe, langage cash',
+    stress: 'Manipule, prend des risques excessifs, méprisant',
+    environnement: 'Compétition, enjeux, action concrète'
+  }
+};
+
+// 36 questions, 6 par type, mélangées
+const QUESTIONS = [
+  { t: 'penseur',     q: "J'aime planifier mes activités à l'avance et suivre un calendrier précis." },
+  { t: 'empathique',  q: "Je ressens facilement les émotions des gens autour de moi." },
+  { t: 'rebelle',     q: "J'aime quand la vie est amusante et pleine de surprises." },
+  { t: 'promoteur',   q: "J'aime relever des défis et prendre des risques calculés." },
+  { t: 'reveur',      q: "J'ai besoin de moments de solitude pour me ressourcer." },
+  { t: 'perseverant', q: "J'ai des convictions fortes que je n'hésite pas à défendre." },
+
+  { t: 'empathique',  q: "L'harmonie dans mes relations est très importante pour moi." },
+  { t: 'penseur',     q: "Je préfère prendre des décisions basées sur des faits et des données." },
+  { t: 'promoteur',   q: "Je sais m'adapter rapidement à différentes situations." },
+  { t: 'rebelle',     q: "Je m'ennuie rapidement dans les routines trop rigides." },
+  { t: 'perseverant', q: "Je m'engage profondément dans les causes auxquelles je crois." },
+  { t: 'reveur',      q: "Je préfère réfléchir longuement avant de m'exprimer." },
+
+  { t: 'rebelle',     q: "Je préfère réagir au moment présent plutôt que tout planifier." },
+  { t: 'empathique',  q: "J'aime prendre soin des autres et créer une ambiance chaleureuse." },
+  { t: 'penseur',     q: "L'organisation et la structure sont essentielles dans mon quotidien." },
+  { t: 'reveur',      q: "J'aime laisser libre cours à mon imagination." },
+  { t: 'promoteur',   q: "Je fonce vers ce que je veux sans hésiter trop longtemps." },
+  { t: 'perseverant', q: "La loyauté et l'intégrité sont des qualités fondamentales pour moi." },
+
+  { t: 'reveur',      q: "Je me sens bien dans le silence et la tranquillité." },
+  { t: 'rebelle',     q: "J'aime quand les choses ont une touche d'originalité ou d'humour." },
+  { t: 'penseur',     q: "J'apprécie les discussions claires, logiques et bien argumentées." },
+  { t: 'empathique',  q: "Je perçois rapidement quand quelqu'un ne va pas bien." },
+  { t: 'perseverant', q: "J'aime exprimer mon opinion sur ce qui est juste ou injuste." },
+  { t: 'promoteur',   q: "J'aime convaincre les autres et obtenir ce que je veux." },
+
+  { t: 'penseur',     q: "Je suis fier de respecter mes engagements et mes échéances." },
+  { t: 'reveur',      q: "J'observe souvent les choses sans intervenir directement." },
+  { t: 'rebelle',     q: "Les conventions et les règles strictes m'agacent." },
+  { t: 'empathique',  q: "J'ai besoin de me sentir apprécié pour bien fonctionner." },
+  { t: 'perseverant', q: "Je donne le meilleur de moi quand je crois en ce que je fais." },
+  { t: 'promoteur',   q: "L'action concrète m'énergise plus que la réflexion prolongée." },
+
+  { t: 'penseur',     q: "J'ai besoin que les choses soient logiques pour bien fonctionner." },
+  { t: 'rebelle',     q: "Je dis souvent ce que je pense de façon spontanée." },
+  { t: 'reveur',      q: "J'apprécie qu'on me donne des consignes claires plutôt que de devoir improviser." },
+  { t: 'empathique',  q: "Je préfère les environnements accueillants et conviviaux." },
+  { t: 'perseverant', q: "Je remarque rapidement quand quelque chose ne respecte pas mes valeurs." },
+  { t: 'promoteur',   q: "Je me sens à l'aise dans des environnements compétitifs." }
+];
+
+// =================================================================
+// State
+// =================================================================
+const state = {
+  current: 0,
+  answers: new Array(QUESTIONS.length).fill(null)
+};
+
+// =================================================================
+// Init
+// =================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  const date = new Date();
+  document.getElementById('header-date').textContent =
+    date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Likert clicks
+  document.querySelectorAll('.likert-option').forEach(btn => {
+    btn.addEventListener('click', () => selectAnswer(parseInt(btn.dataset.val)));
+  });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (!document.getElementById('screen-quiz').classList.contains('active')) return;
+    if (e.key >= '1' && e.key <= '5') {
+      selectAnswer(parseInt(e.key));
+    } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
+      if (!document.getElementById('btn-next').disabled) nextQuestion();
+    } else if (e.key === 'ArrowLeft') {
+      if (!document.getElementById('btn-prev').disabled) prevQuestion();
+    }
+  });
+});
+
+// =================================================================
+// Flow
+// =================================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function startQuiz() {
+  state.current = 0;
+  state.answers = new Array(QUESTIONS.length).fill(null);
+  showScreen('screen-quiz');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[state.current];
+  const num = String(state.current + 1).padStart(2, '0');
+
+  document.getElementById('q-current').textContent = num;
+  document.getElementById('q-num').textContent = `Question ${num}`;
+  document.getElementById('q-text').textContent = q.q;
+
+  const pct = ((state.current) / QUESTIONS.length) * 100;
+  document.getElementById('progress-fill').style.transform = `scaleX(${pct / 100})`;
+  document.getElementById('progress-pct').textContent = Math.round(pct) + '%';
+
+  // Update likert state
+  document.querySelectorAll('.likert-option').forEach(btn => {
+    btn.classList.toggle('selected', parseInt(btn.dataset.val) === state.answers[state.current]);
+  });
+
+  // Update nav
+  document.getElementById('btn-prev').disabled = state.current === 0;
+  document.getElementById('btn-next').disabled = state.answers[state.current] === null;
+  document.getElementById('btn-next').textContent =
+    state.current === QUESTIONS.length - 1 ? 'Voir mes résultats →' : 'Suivant →';
+}
+
+function selectAnswer(value) {
+  state.answers[state.current] = value;
+  document.querySelectorAll('.likert-option').forEach(btn => {
+    btn.classList.toggle('selected', parseInt(btn.dataset.val) === value);
+  });
+  document.getElementById('btn-next').disabled = false;
+
+  // Auto-advance after a short pause for visual feedback
+  setTimeout(() => {
+    if (state.current < QUESTIONS.length - 1) {
+      nextQuestion();
+    } else {
+      showResults();
+    }
+  }, 320);
+}
+
+function nextQuestion() {
+  if (state.current < QUESTIONS.length - 1) {
+    state.current++;
+    renderQuestion();
+  } else {
+    showResults();
+  }
+}
+
+function prevQuestion() {
+  if (state.current > 0) {
+    state.current--;
+    renderQuestion();
+  }
+}
+
+// =================================================================
+// Scoring
+// =================================================================
+function computeScores() {
+  const scores = { penseur: 0, perseverant: 0, empathique: 0, reveur: 0, rebelle: 0, promoteur: 0 };
+  QUESTIONS.forEach((q, i) => {
+    if (state.answers[i] !== null) scores[q.t] += state.answers[i];
+  });
+  // Normaliser : chaque type a 6 questions × 5 max = 30, min = 6
+  // % = ((score - 6) / 24) * 100
+  const normalized = {};
+  for (const t in scores) {
+    normalized[t] = Math.max(0, Math.round(((scores[t] - 6) / 24) * 100));
+  }
+  return { raw: scores, pct: normalized };
+}
+
+function getDominant(scores) {
+  let best = null, max = -Infinity;
+  for (const t in scores.raw) {
+    if (scores.raw[t] > max) { max = scores.raw[t]; best = t; }
+  }
+  return best;
+}
+
+// =================================================================
+// Results
+// =================================================================
+function showResults() {
+  const scores = computeScores();
+  const dominant = getDominant(scores);
+  const type = TYPES[dominant];
+
+  document.getElementById('dominant-name').textContent = type.name;
+  document.getElementById('dominant-name').style.color = type.color;
+  document.getElementById('dominant-tagline').textContent = type.tagline;
+
+  // Chart
+  const chartEl = document.getElementById('chart');
+  chartEl.innerHTML = '';
+
+  // Sort by score descending
+  const sorted = Object.keys(TYPES)
+    .map(k => ({ key: k, ...TYPES[k], score: scores.pct[k] }))
+    .sort((a, b) => b.score - a.score);
+
+  sorted.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'chart-row';
+    row.innerHTML = `
+      <div class="chart-label">${s.name}</div>
+      <div class="chart-bar-track">
+        <div class="chart-bar-fill" style="background:${s.color}" data-pct="${s.score}"></div>
+      </div>
+      <div class="chart-value">${s.score}%</div>
+    `;
+    chartEl.appendChild(row);
+  });
+
+  // Animate bars
+  setTimeout(() => {
+    chartEl.querySelectorAll('.chart-bar-fill').forEach((el, i) => {
+      setTimeout(() => { el.style.width = el.dataset.pct + '%'; }, i * 80);
+    });
+  }, 200);
+
+  // Type card
+  document.getElementById('type-card').innerHTML = `
+    <div class="type-card-header">
+      <div class="type-card-dot" style="background:${type.color}"></div>
+      <div class="type-card-name">${type.name}</div>
+    </div>
+    <div class="type-card-desc">${type.description}</div>
+    <div class="type-card-grid">
+      <div class="tcg-item"><div class="tcg-label">Forces</div><div class="tcg-value">${type.forces}</div></div>
+      <div class="tcg-item"><div class="tcg-label">Perception du monde</div><div class="tcg-value">${type.perception}</div></div>
+      <div class="tcg-item"><div class="tcg-label">Besoins psychologiques</div><div class="tcg-value">${type.besoins}</div></div>
+      <div class="tcg-item"><div class="tcg-label">Style de communication</div><div class="tcg-value">${type.communication}</div></div>
+      <div class="tcg-item"><div class="tcg-label">Sous stress</div><div class="tcg-value">${type.stress}</div></div>
+      <div class="tcg-item"><div class="tcg-label">Environnement idéal</div><div class="tcg-value">${type.environnement}</div></div>
+    </div>
+  `;
+
+  document.getElementById('progress-fill').style.transform = 'scaleX(1)';
+  document.getElementById('progress-pct').textContent = '100%';
+
+  showScreen('screen-results');
+}
+
+function resetTest() {
+  state.current = 0;
+  state.answers = new Array(QUESTIONS.length).fill(null);
+  showScreen('screen-welcome');
+}
+
+// =================================================================
+// PDF Export
+// =================================================================
+async function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  const scores = computeScores();
+  const dominant = getDominant(scores);
+  const type = TYPES[dominant];
+
+  const pageW = 210, pageH = 297;
+  const marginX = 18;
+  let y = 24;
+
+  // Helper: hex to RGB
+  const hex2rgb = (hex) => {
+    const h = hex.replace('#', '');
+    return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+  };
+
+  // Background tint
+  doc.setFillColor(241, 235, 224);
+  doc.rect(0, 0, pageW, pageH, 'F');
+
+  // Header
+  doc.setFont('times', 'italic');
+  doc.setFontSize(12);
+  doc.setTextColor(28, 26, 23);
+  doc.text('P · C · M', marginX, y);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(122, 112, 101);
+  const date = new Date().toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' });
+  doc.text(date.toUpperCase(), pageW - marginX, y, { align: 'right' });
+
+  y += 4;
+  doc.setDrawColor(217, 210, 197);
+  doc.setLineWidth(0.2);
+  doc.line(marginX, y, pageW - marginX, y);
+
+  y += 16;
+
+  // Eyebrow
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(122, 112, 101);
+  doc.text('— RÉSULTATS PERSONNELS', marginX, y);
+
+  y += 14;
+
+  // Title
+  doc.setFont('times', 'normal');
+  doc.setFontSize(28);
+  doc.setTextColor(28, 26, 23);
+  doc.text('Ta dominante :', marginX, y);
+
+  y += 12;
+  doc.setFont('times', 'italic');
+  doc.setFontSize(36);
+  const [r, g, b] = hex2rgb(type.color);
+  doc.setTextColor(r, g, b);
+  doc.text(type.name, marginX, y);
+
+  y += 8;
+  doc.setFont('times', 'italic');
+  doc.setFontSize(13);
+  doc.setTextColor(122, 112, 101);
+  doc.text(type.tagline, marginX, y);
+
+  y += 16;
+
+  // Section: Chart
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(122, 112, 101);
+  doc.text('— RÉPARTITION DES SIX PROFILS', marginX, y);
+  y += 8;
+
+  doc.setDrawColor(217, 210, 197);
+  doc.line(marginX, y, pageW - marginX, y);
+  y += 8;
+
+  // Chart bars
+  const sorted = Object.keys(TYPES)
+    .map(k => ({ key: k, ...TYPES[k], score: scores.pct[k] }))
+    .sort((a, b) => b.score - a.score);
+
+  const labelW = 32, barX = marginX + labelW, barW = pageW - marginX - barX - 18, barH = 5;
+
+  sorted.forEach(s => {
+    doc.setFont('times', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(28, 26, 23);
+    doc.text(s.name, marginX, y + 3.5);
+
+    // Bar track
+    doc.setFillColor(232, 225, 210);
+    doc.rect(barX, y, barW, barH, 'F');
+
+    // Bar fill
+    const [br, bg, bb] = hex2rgb(s.color);
+    doc.setFillColor(br, bg, bb);
+    doc.rect(barX, y, (barW * s.score) / 100, barH, 'F');
+
+    // Value
+    doc.setFont('times', 'italic');
+    doc.setFontSize(10);
+    doc.setTextColor(58, 53, 46);
+    doc.text(s.score + '%', pageW - marginX, y + 3.5, { align: 'right' });
+
+    y += 9;
+  });
+
+  y += 8;
+
+  // Section: Profil détaillé
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(122, 112, 101);
+  doc.text('— PROFIL DÉTAILLÉ', marginX, y);
+  y += 8;
+
+  doc.setDrawColor(217, 210, 197);
+  doc.line(marginX, y, pageW - marginX, y);
+  y += 10;
+
+  // Description
+  doc.setFont('times', 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(58, 53, 46);
+  const descLines = doc.splitTextToSize(type.description, pageW - marginX * 2);
+  doc.text(descLines, marginX, y);
+  y += descLines.length * 5.2 + 8;
+
+  // Detail grid (2 cols)
+  const colW = (pageW - marginX * 2 - 8) / 2;
+  const items = [
+    ['FORCES', type.forces],
+    ['PERCEPTION DU MONDE', type.perception],
+    ['BESOINS PSYCHOLOGIQUES', type.besoins],
+    ['STYLE DE COMMUNICATION', type.communication],
+    ['SOUS STRESS', type.stress],
+    ['ENVIRONNEMENT IDÉAL', type.environnement]
+  ];
+
+  for (let i = 0; i < items.length; i += 2) {
+    const startY = y;
+    let maxH = 0;
+
+    for (let j = 0; j < 2 && i + j < items.length; j++) {
+      const [label, value] = items[i + j];
+      const x = marginX + j * (colW + 8);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(122, 112, 101);
+      doc.text(label, x, startY);
+
+      doc.setFont('times', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(28, 26, 23);
+      const lines = doc.splitTextToSize(value, colW);
+      doc.text(lines, x, startY + 4.5);
+      maxH = Math.max(maxH, 4.5 + lines.length * 4.5);
+    }
+
+    y = startY + maxH + 5;
+  }
+
+  // Footer
+  doc.setDrawColor(217, 210, 197);
+  doc.line(marginX, pageH - 18, pageW - marginX, pageH - 18);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(122, 112, 101);
+  doc.text('TEST PCM · PROCESS COMMUNICATION MODEL', marginX, pageH - 12);
+  doc.text('— ÉDITION PERSONNELLE —', pageW - marginX, pageH - 12, { align: 'right' });
+
+  // Save
+  const fname = `test-pcm_${type.name.toLowerCase()}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  doc.save(fname);
+}
+</script>
+</body>
+</html>
